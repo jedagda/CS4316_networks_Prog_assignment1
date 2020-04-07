@@ -9,10 +9,16 @@ import packet
 from timer import Timer
 
 # Some already defined parameters
-PACKET_SIZE = 512
+
+# Size of the Packet
+PACKET_SIZE = 512 
+# Receiver Address
 RECEIVER_ADDR = ('localhost', 8081)
+# Sender Address
 SENDER_ADDR = ('localhost', 0)
+# Sleep interval
 SLEEP_INTERVAL = 0.05
+# Time out interval
 TIMEOUT_INTERVAL = 0.5
 #WINDOW_SIZE
 N = 4 
@@ -23,6 +29,7 @@ base = 0
 next_seq_num = 0
 mutex = _thread.allocate_lock()
 timer = Timer(TIMEOUT_INTERVAL)
+
 
 
 # Need to have two threads: one for sending and another for receiving ACKs
@@ -45,21 +52,25 @@ def send(sock, file):
         print("File does not exist", file)
         return
     n = slide_window(len(sndpkt))
-    _thread.start_new_thread(receive, (sock, ))
+    timer_per_packet = []
     while base < len(sndpkt):
         mutex.acquire()
+        
         while(next_seq_num < base + n):
-            udt.send(sndpkt[next_seq_num], sock, RECEIVER_ADDR)
+            udt.send(sndpkt[next_seq_num - 1], sock, RECEIVER_ADDR)
+            timer = Timer(TIMEOUT_INTERVAL)
+            timer_per_packet.append(timer)
+            timer_per_packet[next_seq_num].start()    
+            print("timer started for packet" , next_seq_num)
+            _thread.start_new_thread(receive, (sock, ))
             print("Sending packet number ", next_seq_num)
             next_seq_num += 1
-        if not timer.running():
-            timer.start()    
-        while(timer.running() and not timer.timeout()):
+        while(timer_per_packet[next_seq_num-1].running() and not timer_per_packet[next_seq_num-1].timeout()):
             mutex.release()
             time.sleep(SLEEP_INTERVAL)
             mutex.acquire()
-        if(timer.timeout()):
-            timer.stop()
+        if(timer_per_packet[next_seq_num-1].timeout()):
+            timer_per_packet[next_seq_num-1].stop()
             next_seq_num = base
         else:
             n = slide_window(len(sndpkt))
@@ -78,11 +89,10 @@ def receive(sock):
     while True:
         pkt, address = udt.recv(sock)
         ack_num, ack = packet.extract(pkt)
-
         print('Received ACK' , ack_num)
         if(ack_num >= base):
             mutex.acquire()
-            base = ack_num + 1
+            base += 1
             print('Base updated' , base)
             timer.stop()
             mutex.release()
@@ -91,6 +101,8 @@ def receive(sock):
 def slide_window(packets):
     global base
     return min(N, packets - base)
+
+
 
 
 # Main function

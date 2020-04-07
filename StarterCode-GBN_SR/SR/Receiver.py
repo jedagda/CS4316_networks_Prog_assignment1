@@ -5,22 +5,27 @@ import sys
 import udt
 
 RECEIVER_ADDR = ('localhost', 8081)
+#WINDOW SIZE
+N = 4
 
+
+
+
+base = 0
 
 # Receive packets from the sender
 def receive(sock, filename):
+    global base
+    global N
+    
    # fill your code here
     try:
         f = open(filename, 'wb')
     except IOError:
         print('could not open: ', filename)
         return
-    
-    base = 0
-    ACK = 'got it fam'
 
-
-    while True:
+    while(base < base + N -1):
         pkt, address = udt.recv(sock)
         print('Receiving packet from ', address)
         if not pkt:
@@ -29,15 +34,11 @@ def receive(sock, filename):
         print('We just received sequence number ', seq_num, '\n')
         print(data , '\n')
         if seq_num == base:
-    	    ack_pkt = packet.make(base)
+    	    ack_pkt = packet.make(seq_num)
     	    print('made an ack packet and read to send! \n')
     	    udt.send(ack_pkt, sock, address) 
     	    base = base+1
     	    f.write(data)
-        else:
-            ack_pkt = packet.make(base-1)
-            udt.send(ack_pkt ,sock, address)
-
     f.close()
 
 
