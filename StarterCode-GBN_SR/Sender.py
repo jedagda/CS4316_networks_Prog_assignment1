@@ -10,7 +10,7 @@ from timer import Timer
 
 # Some already defined parameters
 PACKET_SIZE = 512
-RECEIVER_ADDR = ('localhost', 8080)
+RECEIVER_ADDR = ('localhost', 8081)
 SENDER_ADDR = ('localhost', 0)
 SLEEP_INTERVAL = 0.05
 TIMEOUT_INTERVAL = 0.5
@@ -27,9 +27,6 @@ timer = Timer(TIMEOUT_INTERVAL)
 
 # Need to have two threads: one for sending and another for receiving ACKs
 
-
-
-
 # Send thread
 def send(sock, file):
     sndpkt = []
@@ -44,32 +41,32 @@ def send(sock, file):
                 sndpkt.append(packet.make(seq_num, data.read(PACKET_SIZE)))
                 seq_num += 1
                 byte_index += PACKET_SIZE
+            
     except IOError:
         print("File does not exist", file)
         return
+    
+    
+    
     _thread.start_new_thread(receive, (sock, ))
-
-
     while base < len(sndpkt):
         mutex.acquire()
         while(next_seq_num < base + N):
-            udt.send(sndpkt[nxt_pkt], sock, RECEIVER_ADDR)
+            udt.send(sndpkt[next_seq_num], sock, RECEIVER_ADDR)
+            print("Sending packet number ", next_seq_num)
             next_seq_num += 1
-
-        print("Staring Timer")
-        timer.start()    
-
+        if not timer.running():
+            timer.start()    
         while(timer.running() and not timer.timeout()):
             mutex.release()
             time.sleep(SLEEP_INTERVAL)
             mutex.acquire()
         if(timer.timeout()):
-            print('Time Out')
             timer.stop()
             next_seq_num = base
         mutex.release()
     udt.send(packet.make_empty(), sock, RECEIVER_ADDR)
-    file.close()
+    
 
 
 
@@ -77,20 +74,18 @@ def send(sock, file):
 # Receive thread
 def receive(sock):
 	# Fill out the code here
+    global base 
     while True:
-        pkt, _ = udt.recv(sock)
-        ack, _ = packet.extract(pkt)
+        pkt, address = udt.recv(sock)
+        ack_num, ack = packet.extract(pkt)
 
         print('Received ACK')
-        if(ack >= base):
+        if(ack_num >= base):
             mutex.acquire()
-            base = ack + 1
+            base = ack_num + 1
             print('Base updated' , base)
             timer.stop()
             mutex.release()
-
-
-
 
 
 # Main function
@@ -102,7 +97,6 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(SENDER_ADDR)
     filename = sys.argv[1]
-
     send(sock, filename)
     sock.close()
 
