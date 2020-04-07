@@ -10,7 +10,7 @@ from timer import Timer
 
 # Some already defined parameters
 PACKET_SIZE = 512
-RECEIVER_ADDR = ('localhost', 8080)
+RECEIVER_ADDR = ('localhost', 8081)
 SENDER_ADDR = ('localhost', 0)
 SLEEP_INTERVAL = 0.05
 TIMEOUT_INTERVAL = 0.5
@@ -78,11 +78,11 @@ def send(sock, file):
 def receive(sock):
 	# Fill out the code here
     while True:
-        pkt, _ = udt.recv(sock)
-        ack, _ = packet.extract(pkt)
+        pkt, address = udt.recv(sock)
+        ack_num, ack = packet.extract(pkt)
 
         print('Received ACK')
-        if(ack >= base):
+        if(ack_num >= base):
             mutex.acquire()
             base = ack + 1
             print('Base updated' , base)
@@ -102,7 +102,6 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(SENDER_ADDR)
     filename = sys.argv[1]
-
     send(sock, filename)
     sock.close()
 

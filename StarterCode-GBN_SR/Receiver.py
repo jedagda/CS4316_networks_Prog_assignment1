@@ -4,39 +4,41 @@ import socket
 import sys
 import udt
 
-RECEIVER_ADDR = ('localhost', 8080)
+RECEIVER_ADDR = ('localhost', 8081)
 
 
 # Receive packets from the sender
 def receive(sock, filename):
    # fill your code here
     try:
-        f = open(filename, 'wb2')
+        f = open(filename, 'wb')
     except IOError:
         print('could not open: ', filename)
         return
     
-    n=0
+    base = 0
+    ACK = 'got it fam'
+
 
     while True:
-        p = udt.rcv(sock)
-        if not p:
+        pkt, address = udt.recv(sock)
+        print('Receiving packet from ', address)
+        if not pkt:
             break
-        sequence_num = packet.extract(p)
-        data = packet.extract(p)
-
-        if sequence_num == n:
-    	    p = packet.make(n)
-    	    print('received packet')
-    	    address = udt.rcv(sock)
-    	    udt.send(p,sock,address) 
-    	    n = n+1
+        seq_num, data = packet.extract(pkt)
+        print('We just received sequence number ', seq_num, '\n')
+        print(data , '\n')
+        if seq_num == base:
+    	    ack_pkt = packet.make(base)
+    	    print('made an ack packet and read to send! \n')
+    	    udt.send(ack_pkt, sock, address) 
+    	    base = base+1
     	    f.write(data)
         else:
-            p = packet.make(n-1)
-            udt.send(p,sock,address)
+            ack_pkt = packet.make(base-1)
+            udt.send(ack_pkt ,sock, address)
 
-    file.close
+    f.close()
 
 
 # Main function
