@@ -32,8 +32,8 @@ def send(sock, file):
     sndpkt = []
     seq_num = 0
     next_seq_num = 0
-    nxt_pkt = 0
     byte_index = 0
+    global base
     try:
         with open(file, "rb") as data:
             byte_length = os.path.getsize(file)
@@ -41,17 +41,14 @@ def send(sock, file):
                 sndpkt.append(packet.make(seq_num, data.read(PACKET_SIZE)))
                 seq_num += 1
                 byte_index += PACKET_SIZE
-            
     except IOError:
         print("File does not exist", file)
         return
-    
-    
-    
+    n = slide_window(len(sndpkt))
     _thread.start_new_thread(receive, (sock, ))
     while base < len(sndpkt):
         mutex.acquire()
-        while(next_seq_num < base + N):
+        while(next_seq_num < base + n):
             udt.send(sndpkt[next_seq_num], sock, RECEIVER_ADDR)
             print("Sending packet number ", next_seq_num)
             next_seq_num += 1
@@ -64,9 +61,12 @@ def send(sock, file):
         if(timer.timeout()):
             timer.stop()
             next_seq_num = base
+        else:
+            n = slide_window(len(sndpkt))
         mutex.release()
+
     udt.send(packet.make_empty(), sock, RECEIVER_ADDR)
-    
+    data.close()
 
 
 
@@ -79,13 +79,18 @@ def receive(sock):
         pkt, address = udt.recv(sock)
         ack_num, ack = packet.extract(pkt)
 
-        print('Received ACK')
+        print('Received ACK' , ack_num)
         if(ack_num >= base):
             mutex.acquire()
             base = ack_num + 1
             print('Base updated' , base)
             timer.stop()
             mutex.release()
+
+
+def slide_window(packets):
+    global base
+    return min(N, packets - base)
 
 
 # Main function
